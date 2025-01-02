@@ -1,48 +1,34 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
-using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 public class HandReader : MonoBehaviour
 {
-    private Dictionary<int, HandPoseFrame> handPoses = new Dictionary<int, HandPoseFrame>();
-    private int currentFrame = 0;
-    private bool isPlaying = false;
-    private GameObject[] leftHandSpheres;
-    private GameObject[] rightHandSpheres;
-
-    [System.Serializable]
-    private class HandPoseFrame
-    {
-        public JToken left_hands { get; set; }
-        public JToken right_hands { get; set; }
-    }
+    readonly Dictionary<int, HandFrameData> handPoses = new();
+    int currentFrame = 0;
+    bool isPlaying = false;
+    GameObject[] leftHandSpheres;
+    GameObject[] rightHandSpheres;
 
     void Start()
     {
-        // Read JSON file
+        // Read and parse JSON file
         string jsonPath = Path.Combine(Application.streamingAssetsPath, "hand_poses.json");
         string jsonContent = File.ReadAllText(jsonPath);
         
-        // Parse JSON
-        JObject data = JObject.Parse(jsonContent);
-        foreach (var frame in data)
+        // Use JsonConvert instead of JsonUtility
+        Dictionary<string, HandFrameData> rawData = JsonConvert.DeserializeObject<Dictionary<string, HandFrameData>>(jsonContent);
+        foreach (KeyValuePair<string, HandFrameData> kvp in rawData)
         {
-            int frameNumber = int.Parse(frame.Key);
-            var pose = new HandPoseFrame
-            {
-                left_hands = frame.Value["left_hands"],
-                right_hands = frame.Value["right_hands"]
-            };
-            handPoses[frameNumber] = pose;
+            handPoses[int.Parse(kvp.Key)] = kvp.Value;
         }
 
-        // Initialize spheres (15 joints per hand)
         leftHandSpheres = CreateHandSpheres(Color.red);
         rightHandSpheres = CreateHandSpheres(Color.blue);
     }
 
-    private GameObject[] CreateHandSpheres(Color color)
+    GameObject[] CreateHandSpheres(Color color)
     {
         GameObject[] spheres = new GameObject[15];
         for (int i = 0; i < 15; i++)
@@ -75,56 +61,22 @@ public class HandReader : MonoBehaviour
         }
     }
 
-    private void UpdateHandPositions()
+    void UpdateHandPositions()
     {
-        HandPoseFrame frame = handPoses[currentFrame];
+        HandFrameData frame = handPoses[currentFrame];
 
         // Update left hand
-        try 
+        List<Vector3> leftJoints = frame.GetLeftHandJoints();
+        for (int i = 0; i < leftJoints.Count && i < 15; i++)
         {
-            var leftHandData = frame.left_hands;
-            if (leftHandData != null && leftHandData.HasValues && leftHandData[0].HasValues)
-            {
-                var joints = leftHandData[0][0][0] as JArray;
-                if (joints != null)
-                {
-                    for (int i = 0; i < joints.Count && i < 15; i++)
-                    {
-                        var coords = joints[i];
-                        Vector3 position = new Vector3(
-                            coords[0].Value<float>(),
-                            coords[1].Value<float>(),
-                            coords[2].Value<float>()
-                        );
-                        leftHandSpheres[i].transform.position = position;
-                    }
-                }
-            }
+            leftHandSpheres[i].transform.position = leftJoints[i];
         }
-        catch (System.Exception) { } // Ignore empty or malformed data
 
         // Update right hand
-        try 
+        List<Vector3> rightJoints = frame.GetRightHandJoints();
+        for (int i = 0; i < rightJoints.Count && i < 15; i++)
         {
-            var rightHandData = frame.right_hands;
-            if (rightHandData != null && rightHandData.HasValues && rightHandData[0].HasValues)
-            {
-                var joints = rightHandData[0][0][0] as JArray;
-                if (joints != null)
-                {
-                    for (int i = 0; i < joints.Count && i < 15; i++)
-                    {
-                        var coords = joints[i];
-                        Vector3 position = new Vector3(
-                            coords[0].Value<float>(),
-                            coords[1].Value<float>(),
-                            coords[2].Value<float>()
-                        );
-                        rightHandSpheres[i].transform.position = position;
-                    }
-                }
-            }
+            rightHandSpheres[i].transform.position = rightJoints[i];
         }
-        catch (System.Exception) { } // Ignore empty or malformed data
     }
 }
