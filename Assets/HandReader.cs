@@ -17,32 +17,41 @@ public class HandReader : MonoBehaviour
     float frameTimer = 0f;
     const float frameInterval = 1f / TARGET_FPS;
 
+    GameObject leftHandTransform;
+    GameObject rightHandTransform;
+
     // Define finger connections using MANO joint indices
     static readonly (HandJoint, HandJoint)[] fingerConnections = new[]
     {
         // Thumb chain
         (HandJoint.Wrist, HandJoint.Thumb1),
         (HandJoint.Thumb1, HandJoint.Thumb2),
+        (HandJoint.Thumb2, HandJoint.Thumb3),
+        (HandJoint.Thumb3, HandJoint.Thumb4),
         
         // Index finger chain
         (HandJoint.Wrist, HandJoint.Index1),
         (HandJoint.Index1, HandJoint.Index2),
         (HandJoint.Index2, HandJoint.Index3),
+        (HandJoint.Index3, HandJoint.Index4),
         
         // Middle finger chain
         (HandJoint.Wrist, HandJoint.Middle1),
         (HandJoint.Middle1, HandJoint.Middle2),
         (HandJoint.Middle2, HandJoint.Middle3),
+        (HandJoint.Middle3, HandJoint.Middle4),
         
         // Ring finger chain
         (HandJoint.Wrist, HandJoint.Ring1),
         (HandJoint.Ring1, HandJoint.Ring2),
         (HandJoint.Ring2, HandJoint.Ring3),
+        (HandJoint.Ring3, HandJoint.Ring4),
         
         // Pinky chain
         (HandJoint.Wrist, HandJoint.Pinky1),
         (HandJoint.Pinky1, HandJoint.Pinky2),
-        (HandJoint.Pinky2, HandJoint.Pinky3)
+        (HandJoint.Pinky2, HandJoint.Pinky3),
+        (HandJoint.Pinky3, HandJoint.Pinky4)
     };
 
     void Start()
@@ -58,35 +67,41 @@ public class HandReader : MonoBehaviour
             handPoses[int.Parse(kvp.Key)] = kvp.Value;
         }
 
-        leftHandSpheres = CreateHandSpheres(Color.red);
-        rightHandSpheres = CreateHandSpheres(Color.blue);
+        // Create separate transforms for each hand
+        leftHandTransform = new GameObject("LeftHandTransform");
+        rightHandTransform = new GameObject("RightHandTransform");
+        leftHandTransform.transform.parent = transform;
+        rightHandTransform.transform.parent = transform;
+
+        leftHandSpheres = CreateHandSpheres(Color.red, leftHandTransform.transform);
+        rightHandSpheres = CreateHandSpheres(Color.blue, rightHandTransform.transform);
         
-        leftHandLines = CreateHandLines(Color.red);
-        rightHandLines = CreateHandLines(Color.blue);
+        leftHandLines = CreateHandLines(Color.red, leftHandTransform.transform);
+        rightHandLines = CreateHandLines(Color.blue, rightHandTransform.transform);
     }
 
-    GameObject[] CreateHandSpheres(Color color)
+    GameObject[] CreateHandSpheres(Color color, Transform parent)
     {
         GameObject[] spheres = new GameObject[Enum.GetValues(typeof(HandJoint)).Length];
         foreach (HandJoint joint in Enum.GetValues(typeof(HandJoint)))
         {
             GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             sphere.name = $"{(color == Color.red ? "Left" : "Right")}_{joint}";
-            sphere.transform.localScale = Vector3.one * 0.03f; // 3cm diameter
+            sphere.transform.localScale = Vector3.one * 0.01f; // 1cm diameter
             sphere.GetComponent<Renderer>().material.color = color;
-            sphere.transform.parent = transform;
+            sphere.transform.parent = parent;
             spheres[(int)joint] = sphere;
         }
         return spheres;
     }
 
-    LineRenderer[] CreateHandLines(Color color)
+    LineRenderer[] CreateHandLines(Color color, Transform parent)
     {
         LineRenderer[] lines = new LineRenderer[fingerConnections.Length];
         for (int i = 0; i < fingerConnections.Length; i++)
         {
             GameObject lineObj = new($"HandLine_{i}");
-            lineObj.transform.parent = transform;
+            lineObj.transform.parent = parent;
             LineRenderer line = lineObj.AddComponent<LineRenderer>();
             line.startWidth = 0.005f;
             line.endWidth = 0.005f;
@@ -128,23 +143,38 @@ public class HandReader : MonoBehaviour
         HandFrameData frame = handPoses[currentFrame];
 
         // Update left hand
-        List<Vector3> leftJoints = frame.GetLeftHandJoints();
-        UpdateHandJointsAndLines(leftJoints, leftHandSpheres, leftHandLines);
+        var (leftJoints, leftWristOrientation) = frame.GetLeftHandJoints();
+        if (leftWristOrientation.HasValue)
+        {
+            leftHandTransform.transform.position = leftWristOrientation.Value;
+            UpdateHandJointsAndLines(leftJoints, leftHandSpheres, leftHandLines);
+        }
 
         // Update right hand
-        List<Vector3> rightJoints = frame.GetRightHandJoints();
-        UpdateHandJointsAndLines(rightJoints, rightHandSpheres, rightHandLines);
+        var (rightJoints, rightWristOrientation) = frame.GetRightHandJoints();
+        if (rightWristOrientation.HasValue)
+        {
+            rightHandTransform.transform.position = rightWristOrientation.Value;
+            UpdateHandJointsAndLines(rightJoints, rightHandSpheres, rightHandLines);
+        }
     }
 
     static void UpdateHandJointsAndLines(List<Vector3> joints, GameObject[] spheres, LineRenderer[] lines)
     {
-        // Update spheres
-        for (int i = 0; i < joints.Count && i < spheres.Length; i++)
+        // Convert local positions to world space
+        var worldJoints = new Vector3[joints.Count];
+        for (int i = 0; i < joints.Count; i++)
         {
-            spheres[i].transform.position = joints[i];
+            worldJoints[i] = spheres[i].transform.parent.TransformPoint(joints[i]);
         }
 
-        // Update lines
+        // Update spheres and use world positions
+        for (int i = 0; i < joints.Count && i < spheres.Length; i++)
+        {
+            spheres[i].transform.position = worldJoints[i];
+        }
+
+        // Update lines with world positions
         for (int i = 0; i < fingerConnections.Length && i < lines.Length; i++)
         {
             (HandJoint start, HandJoint end) = fingerConnections[i];
@@ -152,8 +182,8 @@ public class HandReader : MonoBehaviour
             int endIdx = (int)end;
             if (startIdx < joints.Count && endIdx < joints.Count)
             {
-                lines[i].SetPosition(0, joints[startIdx]);
-                lines[i].SetPosition(1, joints[endIdx]);
+                lines[i].SetPosition(0, worldJoints[startIdx]);
+                lines[i].SetPosition(1, worldJoints[endIdx]);
             }
         }
     }
