@@ -22,7 +22,7 @@ public class HandFrameData
         return ConvertToVector3List(right_hands);
     }
 
-    private List<Vector3> ConvertToVector3List(double[][][][] handData)
+    List<Vector3> ConvertToVector3List(double[][][][] handData)
     {
         List<Vector3> joints = new List<Vector3>();
         if (handData?.Length > 0 && 

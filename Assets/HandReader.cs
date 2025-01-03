@@ -10,6 +10,23 @@ public class HandReader : MonoBehaviour
     bool isPlaying = false;
     GameObject[] leftHandSpheres;
     GameObject[] rightHandSpheres;
+    LineRenderer[] leftHandLines;
+    LineRenderer[] rightHandLines;
+    
+    // Define finger connections (indices of joints to connect)
+    static readonly (int, int)[] fingerConnections = new[]
+    {
+        // Thumb
+        (0, 1), (1, 2), (2, 3),
+        // Index
+        (0, 4), (4, 5), (5, 6),
+        // Middle
+        (0, 7), (7, 8), (8, 9),
+        // Ring
+        (0, 10), (10, 11), (11, 12),
+        // Pinky
+        (0, 13), (13, 14), (14, 15)
+    };
 
     void Start()
     {
@@ -26,6 +43,9 @@ public class HandReader : MonoBehaviour
 
         leftHandSpheres = CreateHandSpheres(Color.red);
         rightHandSpheres = CreateHandSpheres(Color.blue);
+        
+        leftHandLines = CreateHandLines(Color.red);
+        rightHandLines = CreateHandLines(Color.blue);
     }
 
     GameObject[] CreateHandSpheres(Color color)
@@ -40,6 +60,25 @@ public class HandReader : MonoBehaviour
             spheres[i] = sphere;
         }
         return spheres;
+    }
+
+    LineRenderer[] CreateHandLines(Color color)
+    {
+        LineRenderer[] lines = new LineRenderer[fingerConnections.Length];
+        for (int i = 0; i < fingerConnections.Length; i++)
+        {
+            GameObject lineObj = new($"HandLine_{i}");
+            lineObj.transform.parent = transform;
+            LineRenderer line = lineObj.AddComponent<LineRenderer>();
+            line.startWidth = 0.005f;
+            line.endWidth = 0.005f;
+            line.material = new Material(Shader.Find("Sprites/Default"));
+            line.startColor = color;
+            line.endColor = color;
+            line.positionCount = 2;
+            lines[i] = line;
+        }
+        return lines;
     }
 
     void Update()
@@ -67,16 +106,30 @@ public class HandReader : MonoBehaviour
 
         // Update left hand
         List<Vector3> leftJoints = frame.GetLeftHandJoints();
-        for (int i = 0; i < leftJoints.Count && i < 15; i++)
-        {
-            leftHandSpheres[i].transform.position = leftJoints[i];
-        }
+        UpdateHandJointsAndLines(leftJoints, leftHandSpheres, leftHandLines);
 
         // Update right hand
         List<Vector3> rightJoints = frame.GetRightHandJoints();
-        for (int i = 0; i < rightJoints.Count && i < 15; i++)
+        UpdateHandJointsAndLines(rightJoints, rightHandSpheres, rightHandLines);
+    }
+
+    static void UpdateHandJointsAndLines(List<Vector3> joints, GameObject[] spheres, LineRenderer[] lines)
+    {
+        // Update spheres
+        for (int i = 0; i < joints.Count && i < spheres.Length; i++)
         {
-            rightHandSpheres[i].transform.position = rightJoints[i];
+            spheres[i].transform.position = joints[i];
+        }
+
+        // Update lines
+        for (int i = 0; i < fingerConnections.Length && i < lines.Length; i++)
+        {
+            (int start, int end) = fingerConnections[i];
+            if (start < joints.Count && end < joints.Count)
+            {
+                lines[i].SetPosition(0, joints[start]);
+                lines[i].SetPosition(1, joints[end]);
+            }
         }
     }
 }
