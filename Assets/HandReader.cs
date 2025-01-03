@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
@@ -16,19 +17,32 @@ public class HandReader : MonoBehaviour
     float frameTimer = 0f;
     const float frameInterval = 1f / TARGET_FPS;
 
-    // Define finger connections (indices of joints to connect)
-    static readonly (int, int)[] fingerConnections = new[]
+    // Define finger connections using MANO joint indices
+    static readonly (HandJoint, HandJoint)[] fingerConnections = new[]
     {
-        // Thumb
-        (0, 1), (1, 2), (2, 3),
-        // Index
-        (0, 4), (4, 5), (5, 6),
-        // Middle
-        (0, 7), (7, 8), (8, 9),
-        // Ring
-        (0, 10), (10, 11), (11, 12),
-        // Pinky
-        (0, 13), (13, 14), (14, 15)
+        // Thumb chain
+        (HandJoint.Wrist, HandJoint.Thumb1),
+        (HandJoint.Thumb1, HandJoint.Thumb2),
+        
+        // Index finger chain
+        (HandJoint.Wrist, HandJoint.Index1),
+        (HandJoint.Index1, HandJoint.Index2),
+        (HandJoint.Index2, HandJoint.Index3),
+        
+        // Middle finger chain
+        (HandJoint.Wrist, HandJoint.Middle1),
+        (HandJoint.Middle1, HandJoint.Middle2),
+        (HandJoint.Middle2, HandJoint.Middle3),
+        
+        // Ring finger chain
+        (HandJoint.Wrist, HandJoint.Ring1),
+        (HandJoint.Ring1, HandJoint.Ring2),
+        (HandJoint.Ring2, HandJoint.Ring3),
+        
+        // Pinky chain
+        (HandJoint.Wrist, HandJoint.Pinky1),
+        (HandJoint.Pinky1, HandJoint.Pinky2),
+        (HandJoint.Pinky2, HandJoint.Pinky3)
     };
 
     void Start()
@@ -53,14 +67,15 @@ public class HandReader : MonoBehaviour
 
     GameObject[] CreateHandSpheres(Color color)
     {
-        GameObject[] spheres = new GameObject[15];
-        for (int i = 0; i < 15; i++)
+        GameObject[] spheres = new GameObject[Enum.GetValues(typeof(HandJoint)).Length];
+        foreach (HandJoint joint in Enum.GetValues(typeof(HandJoint)))
         {
             GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphere.name = $"{(color == Color.red ? "Left" : "Right")}_{joint}";
             sphere.transform.localScale = Vector3.one * 0.03f; // 3cm diameter
             sphere.GetComponent<Renderer>().material.color = color;
             sphere.transform.parent = transform;
-            spheres[i] = sphere;
+            spheres[(int)joint] = sphere;
         }
         return spheres;
     }
@@ -132,11 +147,13 @@ public class HandReader : MonoBehaviour
         // Update lines
         for (int i = 0; i < fingerConnections.Length && i < lines.Length; i++)
         {
-            (int start, int end) = fingerConnections[i];
-            if (start < joints.Count && end < joints.Count)
+            (HandJoint start, HandJoint end) = fingerConnections[i];
+            int startIdx = (int)start;
+            int endIdx = (int)end;
+            if (startIdx < joints.Count && endIdx < joints.Count)
             {
-                lines[i].SetPosition(0, joints[start]);
-                lines[i].SetPosition(1, joints[end]);
+                lines[i].SetPosition(0, joints[startIdx]);
+                lines[i].SetPosition(1, joints[endIdx]);
             }
         }
     }
