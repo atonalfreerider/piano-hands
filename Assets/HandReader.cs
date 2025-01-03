@@ -12,7 +12,10 @@ public class HandReader : MonoBehaviour
     GameObject[] rightHandSpheres;
     LineRenderer[] leftHandLines;
     LineRenderer[] rightHandLines;
-    
+    const float TARGET_FPS = 30f;
+    float frameTimer = 0f;
+    const float frameInterval = 1f / TARGET_FPS;
+
     // Define finger connections (indices of joints to connect)
     static readonly (int, int)[] fingerConnections = new[]
     {
@@ -95,8 +98,13 @@ public class HandReader : MonoBehaviour
 
         if (isPlaying && handPoses.ContainsKey(currentFrame))
         {
-            UpdateHandPositions();
-            currentFrame++;
+            frameTimer += Time.deltaTime;
+            if (frameTimer >= frameInterval)
+            {
+                UpdateHandPositions();
+                currentFrame++;
+                frameTimer = 0f;
+            }
         }
     }
 
