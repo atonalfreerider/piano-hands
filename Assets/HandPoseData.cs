@@ -14,49 +14,18 @@ public class JointPosition
 }
 
 [Serializable]
-public class SingleHandData
+public class FrameData
 {
-    public List<JointPosition> joints { get; set; }
-    public JointPosition wrist_orientation { get; set; }
+    public int frame { get; set; }
+    public List<List<float>> body_joints { get; set; }
+    [JsonProperty("left_hand")]
+    public List<List<float>> left_hand { get; set; }
+    [JsonProperty("right_hand")]
+    public List<List<float>> right_hand { get; set; }
 }
 
 [Serializable]
-public class HandFrameData
+public class SubjectData
 {
-    [JsonProperty("left_hands")]
-    public List<SingleHandData> left_hands { get; set; } = new();
-
-    [JsonProperty("right_hands")]
-    public List<SingleHandData> right_hands { get; set; } = new();
-
-    public (List<Vector3>, Vector3?) GetLeftHandJoints()
-    {
-        return ConvertToVector3List(left_hands);
-    }
-
-    public (List<Vector3>, Vector3?) GetRightHandJoints()
-    {
-        return ConvertToVector3List(right_hands);
-    }
-
-    private static (List<Vector3>, Vector3?) ConvertToVector3List(List<SingleHandData> handData)
-    {
-        var joints = new List<Vector3>();
-        Vector3? wristOrientation = null;
-
-        if (handData?.Count > 0 && handData[0]?.joints != null)
-        {
-            foreach (var joint in handData[0].joints)
-            {
-                joints.Add(joint.ToVector3());
-            }
-            
-            if (handData[0].wrist_orientation != null)
-            {
-                wristOrientation = handData[0].wrist_orientation.ToVector3();
-            }
-        }
-
-        return (joints, wristOrientation);
-    }
+    public Dictionary<string, FrameData> frames { get; set; }
 }
